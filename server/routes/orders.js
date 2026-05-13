@@ -132,7 +132,7 @@ router.put('/:id', async (req, res) => {
       UPDATE banquet_orders SET
         customer_id=$1, banquet_type=$2, event_date=$3, location=$4,
         table_count=$5, guest_count=$6, budget=$7, status=$8, notes=$9,
-        updated_at=NOW()
+        updated_at=datetime('now')
       WHERE id=$10 RETURNING *
     `, [customer_id || null, banquet_type, event_date, location || null, table_count, guest_count || null, budget || null, status, notes || null, req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: '订单不存在' });

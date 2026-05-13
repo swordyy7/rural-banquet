@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
     let query = 'SELECT * FROM customers';
     let params = [];
     if (search) {
-      query += ' WHERE name ILIKE $1 OR phone ILIKE $1';
+      query += ' WHERE name LIKE $1 OR phone LIKE $1';
       params = [`%${search}%`];
     }
     query += ' ORDER BY created_at DESC';

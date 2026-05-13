@@ -6,14 +6,14 @@ router.use(authenticate);
 
 // 档期冲突检测
 async function checkSchedule(date, excludeOrderId = null) {
-  let query = `SELECT COUNT(*) FROM banquet_orders WHERE event_date = $1 AND status != 'cancelled'`;
+  let query = `SELECT COUNT(*) AS cnt FROM banquet_orders WHERE event_date = $1 AND status != 'cancelled'`;
   let params = [date];
   if (excludeOrderId) {
     query += ` AND id != $2`;
     params.push(excludeOrderId);
   }
   const { rows } = await db.query(query, params);
-  return parseInt(rows[0].count);
+  return parseInt(rows[0].cnt);
 }
 
 // GET /api/orders/schedule-check?date=&orderId=
@@ -99,9 +99,9 @@ router.get('/:id', async (req, res) => {
 async function genOrderNo() {
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const { rows } = await db.query(
-    `SELECT COUNT(*) FROM banquet_orders WHERE order_no LIKE $1`, [`BQ${today}%`]
+    `SELECT COUNT(*) AS cnt FROM banquet_orders WHERE order_no LIKE $1`, [`BQ${today}%`]
   );
-  const seq = String(parseInt(rows[0].count) + 1).padStart(3, '0');
+  const seq = String(parseInt(rows[0].cnt) + 1).padStart(3, '0');
   return `BQ${today}${seq}`;
 }
 

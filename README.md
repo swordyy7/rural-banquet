@@ -15,7 +15,6 @@
 rural-banquet/
 ├── client/                 # React 前端
 ├── server/                 # Express.js 后端
-└── docs/                   # 设计文档和实现计划
 ```
 
 ## 启动步骤

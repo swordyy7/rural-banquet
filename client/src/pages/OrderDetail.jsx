@@ -21,6 +21,7 @@ export default function OrderDetail() {
   const [menuForm,   setMenuForm]   = useState({ menu_id: '', dish_id: '', quantity: 1 });
   const [settleForm, setSettleForm] = useState({ total_amount: '', actual_cost: '', received_amount: '', payment_method: '现金', notes: '' });
   const [saving, setSaving]         = useState(false);
+  const [saveMsg, setSaveMsg]       = useState(null);
 
   function reload() {
     getOrder(id).then(o => {
@@ -70,6 +71,7 @@ export default function OrderDetail() {
 
   async function handleSaveSettlement() {
     setSaving(true);
+    setSaveMsg(null);
     try {
       await saveSettlement(id, {
         total_amount: Number(settleForm.total_amount) || 0,
@@ -79,6 +81,9 @@ export default function OrderDetail() {
         notes: settleForm.notes,
       });
       reload();
+      setSaveMsg({ ok: true, text: '结算已保存，订单已标记为已完成' });
+    } catch (err) {
+      setSaveMsg({ ok: false, text: err.error || err.message || '保存失败，请重试' });
     } finally {
       setSaving(false);
     }
@@ -300,6 +305,11 @@ export default function OrderDetail() {
                   <span>未收款</span>
                   <span className={unreceived > 0 ? 'text-red-500' : 'text-green-600'}>{fmtMoney(unreceived)}</span>
                 </div>
+              </div>
+            )}
+            {saveMsg && (
+              <div className={`rounded-lg px-3 py-2 text-sm ${saveMsg.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                {saveMsg.text}
               </div>
             )}
             <button onClick={handleSaveSettlement} disabled={saving}

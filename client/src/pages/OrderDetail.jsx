@@ -21,10 +21,11 @@ export default function OrderDetail() {
 
   const [changeForm, setChangeForm] = useState({ change_type: 'table_count', before_value: '', after_value: '', reason: '' });
   const [laborForm,  setLaborForm]  = useState({ role: '帮厨', name: '', phone: '', fee: '' });
-  const [menuForm,   setMenuForm]   = useState({ menu_id: '', dish_id: '', quantity: 1 });
+  const [menuForm,   setMenuForm]   = useState({ menu_id: '', dish_id: '', quantity: 1, notes: '' });
   const [settleForm, setSettleForm] = useState({ total_amount: '', actual_cost: '', received_amount: '', payment_method: '现金', notes: '' });
   const [saving, setSaving]         = useState(false);
   const [saveMsg, setSaveMsg]       = useState(null);
+  const [menuMsg, setMenuMsg]       = useState(null);
 
   function reload() {
     getOrder(id).then(o => {
@@ -67,9 +68,14 @@ export default function OrderDetail() {
 
   async function handleAddMenuItem() {
     if (!menuForm.menu_id && !menuForm.dish_id) return;
-    await addMenuDetail(id, { ...menuForm, quantity: Number(menuForm.quantity) });
-    setMenuForm({ menu_id: '', dish_id: '', quantity: 1 });
-    reload();
+    setMenuMsg(null);
+    try {
+      await addMenuDetail(id, { ...menuForm, quantity: Number(menuForm.quantity) || 1 });
+      setMenuForm({ menu_id: '', dish_id: '', quantity: 1, notes: '' });
+      reload();
+    } catch (err) {
+      setMenuMsg(err.error || err.message || '添加失败，请重试');
+    }
   }
 
   async function handleSaveSettlement() {
@@ -178,24 +184,37 @@ export default function OrderDetail() {
               </select>
               <input type="number" min="1" className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-20"
                 placeholder="数量" value={menuForm.quantity} onChange={e => setMenuForm({ ...menuForm, quantity: e.target.value })} />
-              <button onClick={handleAddMenuItem} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">添加</button>
+              <input className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-40"
+                placeholder="备注" value={menuForm.notes} onChange={e => setMenuForm({ ...menuForm, notes: e.target.value })} />
+              <button onClick={handleAddMenuItem} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
+                {menuForm.menu_id ? '套用菜单' : '添加菜品'}
+              </button>
             </div>
+            {menuMsg && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{menuMsg}</div>}
             <table className="w-full text-sm">
               <thead className="text-xs text-gray-500">
-                <tr><th className="text-left pb-2">菜单/菜品</th><th className="text-left pb-2">数量</th><th></th></tr>
+                <tr>
+                  <th className="text-left pb-2">菜品</th>
+                  <th className="text-left pb-2">来源菜单</th>
+                  <th className="text-left pb-2">数量</th>
+                  <th className="text-left pb-2">备注</th>
+                  <th></th>
+                </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {order.menu_details?.map(d => (
                   <tr key={d.id}>
-                    <td className="py-2">{d.menu_name || d.dish_name || '-'}</td>
+                    <td className="py-2 font-medium">{d.dish_name || '-'}</td>
+                    <td className="py-2 text-gray-500">{d.menu_name || '单独添加'}</td>
                     <td className="py-2">{d.quantity}</td>
+                    <td className="py-2 text-gray-500">{d.notes || '-'}</td>
                     <td className="py-2 text-right">
                       <button onClick={async () => { await removeMenuDetail(id, d.id); reload(); }} className="text-red-500 text-xs hover:underline">移除</button>
                     </td>
                   </tr>
                 ))}
                 {(!order.menu_details || order.menu_details.length === 0) && (
-                  <tr><td colSpan={3} className="py-4 text-center text-gray-400">暂无菜单明细</td></tr>
+                  <tr><td colSpan={5} className="py-4 text-center text-gray-400">暂无菜单明细</td></tr>
                 )}
               </tbody>
             </table>

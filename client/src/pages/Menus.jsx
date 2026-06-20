@@ -5,10 +5,10 @@ import {
 } from '../api';
 import { fmtMoney } from '../utils/format';
 
-function Modal({ title, onClose, children }) {
+function Modal({ title, onClose, children, wide = false }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+      <div className={`bg-white rounded-xl shadow-xl w-full ${wide ? 'max-w-3xl' : 'max-w-md'} p-6`}>
         <div className="flex justify-between items-center mb-4">
           <h3 className="font-semibold">{title}</h3>
           <button onClick={onClose} className="text-gray-400 text-xl">&times;</button>
@@ -35,8 +35,18 @@ export default function Menus() {
 
   function openMenu(m = null) {
     setForm(m
-      ? { name: m.name, scene: m.scene || '', price: m.price || '', description: m.description || '' }
-      : { name: '', scene: '', price: '', description: '' });
+      ? {
+          name: m.name,
+          scene: m.scene || '',
+          price: m.price || '',
+          description: m.description || '',
+          dishes: (m.dishes || []).map(item => ({
+            dish_id: String(item.dish_id),
+            quantity: item.quantity || 1,
+            notes: item.notes || '',
+          })),
+        }
+      : { name: '', scene: '', price: '', description: '', dishes: [] });
     setEditId(m?.id || null);
     setModal('menu');
   }
@@ -50,8 +60,16 @@ export default function Menus() {
   }
 
   async function saveMenu() {
-    if (editId) await updateMenu(editId, form);
-    else await createMenu(form);
+    const payload = {
+      ...form,
+      dishes: (form.dishes || []).map(item => ({
+        dish_id: Number(item.dish_id),
+        quantity: Number(item.quantity) || 1,
+        notes: item.notes || '',
+      })),
+    };
+    if (editId) await updateMenu(editId, payload);
+    else await createMenu(payload);
     setModal(null); reload();
   }
 
@@ -59,6 +77,29 @@ export default function Menus() {
     if (editId) await updateDish(editId, form);
     else await createDish(form);
     setModal(null); reload();
+  }
+
+  function selectedMenuDish(dishId) {
+    return (form.dishes || []).find(item => String(item.dish_id) === String(dishId));
+  }
+
+  function toggleMenuDish(dishId, checked) {
+    const current = form.dishes || [];
+    setForm({
+      ...form,
+      dishes: checked
+        ? [...current, { dish_id: String(dishId), quantity: 1, notes: '' }]
+        : current.filter(item => String(item.dish_id) !== String(dishId)),
+    });
+  }
+
+  function updateMenuDish(dishId, field, value) {
+    setForm({
+      ...form,
+      dishes: (form.dishes || []).map(item =>
+        String(item.dish_id) === String(dishId) ? { ...item, [field]: value } : item
+      ),
+    });
   }
 
   return (
@@ -77,13 +118,18 @@ export default function Menus() {
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs text-gray-500">
-                <tr>{['菜单名称','适用场景','参考价格','说明','操作'].map(h => <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>)}</tr>
+                <tr>{['菜单名称','适用场景','包含菜品','参考价格','说明','操作'].map(h => <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {menus.map(m => (
                   <tr key={m.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium">{m.name}</td>
                     <td className="px-4 py-3 text-gray-500">{m.scene || '-'}</td>
+                    <td className="px-4 py-3 text-gray-600 max-w-sm">
+                      {m.dishes?.length
+                        ? m.dishes.map(item => item.dish_name).join('、')
+                        : <span className="text-red-400">未配置</span>}
+                    </td>
                     <td className="px-4 py-3">{fmtMoney(m.price)}</td>
                     <td className="px-4 py-3 text-gray-500 max-w-xs truncate">{m.description || '-'}</td>
                     <td className="px-4 py-3 space-x-3">
@@ -92,7 +138,7 @@ export default function Menus() {
                     </td>
                   </tr>
                 ))}
-                {menus.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">暂无菜单</td></tr>}
+                {menus.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">暂无菜单</td></tr>}
               </tbody>
             </table>
           </div>
@@ -128,7 +174,7 @@ export default function Menus() {
       )}
 
       {modal === 'menu' && (
-        <Modal title={editId ? '编辑菜单' : '新建菜单'} onClose={() => setModal(null)}>
+        <Modal title={editId ? '编辑菜单' : '新建菜单'} onClose={() => setModal(null)} wide>
           <div className="space-y-3">
             {[
               ['name','菜单名称*','text'],
@@ -142,6 +188,35 @@ export default function Menus() {
                   value={form[f] || ''} onChange={e => setForm({ ...form, [f]: e.target.value })} />
               </div>
             ))}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-2">关联菜品</label>
+              <div className="border border-gray-200 rounded-lg max-h-72 overflow-auto">
+                {dishes.map(d => {
+                  const selected = selectedMenuDish(d.id);
+                  return (
+                    <div key={d.id} className="grid grid-cols-[1fr_80px_140px] gap-3 items-center px-3 py-2 border-b border-gray-50 last:border-b-0 text-sm">
+                      <label className="flex items-center gap-2 min-w-0">
+                        <input type="checkbox" checked={!!selected} onChange={e => toggleMenuDish(d.id, e.target.checked)} />
+                        <span className="font-medium truncate">{d.name}</span>
+                        <span className="text-xs text-gray-400">{d.category || '未分类'} · {fmtMoney(d.unit_price)}</span>
+                      </label>
+                      <input type="number" min="1" disabled={!selected}
+                        className="border border-gray-300 rounded-lg px-2 py-1 text-sm disabled:bg-gray-50"
+                        value={selected?.quantity || 1}
+                        onChange={e => updateMenuDish(d.id, 'quantity', e.target.value)} />
+                      <input disabled={!selected}
+                        className="border border-gray-300 rounded-lg px-2 py-1 text-sm disabled:bg-gray-50"
+                        placeholder="备注"
+                        value={selected?.notes || ''}
+                        onChange={e => updateMenuDish(d.id, 'notes', e.target.value)} />
+                    </div>
+                  );
+                })}
+                {dishes.length === 0 && (
+                  <div className="px-3 py-8 text-center text-sm text-gray-400">请先在“菜品”页签中新建菜品</div>
+                )}
+              </div>
+            </div>
             <div className="flex gap-2 pt-2">
               <button onClick={saveMenu} className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm">保存</button>
               <button onClick={() => setModal(null)} className="flex-1 border border-gray-300 py-2 rounded-lg text-sm">取消</button>

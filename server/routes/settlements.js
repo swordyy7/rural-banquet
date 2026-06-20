@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const db = require('../db');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireAdmin } = require('../middleware/auth');
 
 router.use(authenticate);
 
@@ -16,8 +16,8 @@ router.get('/:orderId/settlement', async (req, res) => {
   }
 });
 
-// POST /api/orders/:orderId/settlement
-router.post('/:orderId/settlement', async (req, res) => {
+// POST /api/orders/:orderId/settlement（结算涉及财务，仅管理员可保存）
+router.post('/:orderId/settlement', requireAdmin, async (req, res) => {
   const { total_amount, actual_cost, received_amount, payment_method, notes } = req.body;
   try {
     const { rows } = await db.query(`

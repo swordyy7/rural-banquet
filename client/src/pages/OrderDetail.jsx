@@ -7,10 +7,13 @@ import {
 import StatusBadge from '../components/StatusBadge';
 import ChangeLog from '../components/ChangeLog';
 import { fmtDate, fmtMoney, STATUS_LABEL } from '../utils/format';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function OrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [order, setOrder] = useState(null);
   const [dishes, setDishes] = useState([]);
   const [menus, setMenus]   = useState([]);
@@ -99,7 +102,7 @@ export default function OrderDetail() {
     { key: 'menu',       label: `菜单（${order.menu_details?.length || 0}）` },
     { key: 'labor',      label: `人工（${order.labor?.length || 0}）` },
     { key: 'changes',    label: `变更（${order.changes?.length || 0}）` },
-    { key: 'settlement', label: '结算' },
+    ...(isAdmin ? [{ key: 'settlement', label: '结算' }] : []),
   ];
 
   return (
@@ -272,7 +275,7 @@ export default function OrderDetail() {
           </div>
         )}
 
-        {tab === 'settlement' && (
+        {tab === 'settlement' && isAdmin && (
           <div className="max-w-sm space-y-3">
             {[
               ['total_amount','订单总金额（元）'],

@@ -23,6 +23,20 @@ if (isNew) {
   console.log('SQLite 数据库已初始化：admin / admin123');
 }
 
+// 幂等地确保某账号存在（用于已有数据库补种子，不覆盖已有用户）
+function ensureUser(username, password, role) {
+  const exists = db.prepare('SELECT 1 FROM users WHERE username = ?').get(username);
+  if (!exists) {
+    const hash = bcrypt.hashSync(password, 10);
+    db.prepare(`INSERT INTO users (username, password, role) VALUES (?, ?, ?)`)
+      .run(username, hash, role);
+    console.log(`已创建账号：${username} / ${password}（${role}）`);
+  }
+}
+
+// 预置一个工作人员账号，便于验证角色权限（可自行删除）
+ensureUser('staff', 'staff123', 'staff');
+
 // 把 PostgreSQL 的 $1, $2 占位符转换为 SQLite 的 ?
 function translateSql(sql) {
   return sql.replace(/\$(\d+)/g, '?');

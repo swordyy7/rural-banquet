@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getCustomers, createCustomer, updateCustomer, deleteCustomer } from '../api';
 import { fmtDate } from '../utils/format';
+import { useAuth } from '../contexts/AuthContext';
 
 function Modal({ title, onClose, children }) {
   return (
@@ -25,6 +26,8 @@ export default function Customers() {
   const [form, setForm] = useState(EMPTY);
   const [editId, setEditId] = useState(null);
   const [error, setError] = useState('');
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   function load() {
     getCustomers(search).then(setList);
@@ -102,7 +105,9 @@ export default function Customers() {
                 <td className="px-4 py-3 text-gray-400">{fmtDate(c.created_at)}</td>
                 <td className="px-4 py-3 space-x-3">
                   <button onClick={() => openEdit(c)} className="text-blue-600 hover:underline">编辑</button>
-                  <button onClick={() => handleDelete(c.id)} className="text-red-500 hover:underline">删除</button>
+                  {isAdmin && (
+                    <button onClick={() => handleDelete(c.id)} className="text-red-500 hover:underline">删除</button>
+                  )}
                 </td>
               </tr>
             ))}

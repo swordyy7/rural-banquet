@@ -6,7 +6,7 @@
 
 - **前端**: React 18 + Vite + Tailwind CSS + React Router v6
 - **后端**: Node.js + Express.js
-- **数据库**: PostgreSQL
+- **数据库**: SQLite（默认开发用）/ PostgreSQL
 - **认证**: JWT
 
 ## 目录结构
@@ -21,12 +21,23 @@ rural-banquet/
 
 ### 1. 准备数据库
 
-在 PostgreSQL 中创建数据库并执行建表 SQL：
+默认使用 SQLite，无需安装数据库。首次启动后端时会自动创建 `server/db/data.sqlite`，并初始化表结构、演示数据和默认账号。
+
+如果切换到 PostgreSQL，只需要先创建空数据库：
 
 ```bash
 psql -U postgres -c "CREATE DATABASE rural_banquet;"
-psql -U postgres -d rural_banquet -f server/db/init.sql
 ```
+
+然后在 `server/.env` 中设置：
+
+```env
+DB_DRIVER=postgres
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rural_banquet
+PGSSL=false
+```
+
+PostgreSQL 不需要手动执行建表脚本。后端首次启动时，如果检测到 `users` 表不存在，会自动执行 `server/db/schema.postgres.sql`，并补齐默认账号。
 
 ### 2. 启动后端
 
@@ -50,9 +61,8 @@ npm run dev
 
 ## 默认账号
 
-- 用户名: `admin`
-- 密码: `admin123`
-- 角色: 管理员
+- 管理员: `admin` / `admin123`
+- 工作人员: `staff` / `staff123`
 
 ## 功能模块
 
@@ -70,7 +80,9 @@ npm run dev
 后端 `server/.env`：
 
 ```
+DB_DRIVER=sqlite
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rural_banquet
+PGSSL=false
 JWT_SECRET=rural_banquet_secret_2026
 PORT=3001
 ```

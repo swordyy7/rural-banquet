@@ -3,6 +3,7 @@ const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
+const defaultUsers = require('../defaultUsers');
 
 const dbFile = path.join(__dirname, '..', 'data.sqlite');
 const isNew = !fs.existsSync(dbFile);
@@ -15,12 +16,7 @@ db.pragma('foreign_keys = ON');
 if (isNew) {
   const initSql = fs.readFileSync(path.join(__dirname, '..', 'schema.sqlite.sql'), 'utf8');
   db.exec(initSql);
-
-  const hash = bcrypt.hashSync('admin123', 10);
-  db.prepare(`INSERT INTO users (username, password, role) VALUES (?, ?, 'admin')`)
-    .run('admin', hash);
-
-  console.log('SQLite 数据库已初始化：admin / admin123');
+  console.log('SQLite 数据库结构已初始化');
 }
 
 // 幂等地确保某账号存在（用于已有数据库补种子，不覆盖已有用户）
@@ -34,8 +30,11 @@ function ensureUser(username, password, role) {
   }
 }
 
-// 预置一个工作人员账号，便于验证角色权限（可自行删除）
-ensureUser('staff', 'staff123', 'staff');
+for (const user of defaultUsers) {
+  ensureUser(user.username, user.password, user.role);
+}
+
+console.log('SQLite 默认账号已就绪：admin / admin123，staff / staff123');
 
 // 把 PostgreSQL 的 $1, $2 占位符转换为 SQLite 的 ?
 function translateSql(sql) {

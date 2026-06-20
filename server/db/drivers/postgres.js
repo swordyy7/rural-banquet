@@ -3,6 +3,7 @@ const { Pool, types } = require('pg');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
+const defaultUsers = require('../defaultUsers');
 
 // 让 pg 的返回类型与 SQLite 行为一致，前端无需改动：
 //   - bigint（COUNT(*) 等）默认返回字符串 -> 转成 JS number
@@ -28,13 +29,26 @@ async function init() {
   if (!exists) {
     const initSql = fs.readFileSync(path.join(__dirname, '..', 'schema.postgres.sql'), 'utf8');
     await pool.query(initSql);
+    console.log('PostgreSQL 数据库结构已初始化');
+  }
 
-    const hash = bcrypt.hashSync('admin123', 10);
+  for (const user of defaultUsers) {
+    await ensureUser(user.username, user.password, user.role);
+  }
+
+  console.log('PostgreSQL 默认账号已就绪：admin / admin123，staff / staff123');
+}
+
+// 幂等地确保默认账号存在（用于已有数据库补种子，不覆盖已有用户）
+async function ensureUser(username, password, role) {
+  const { rows } = await pool.query('SELECT 1 FROM users WHERE username = $1', [username]);
+  if (!rows[0]) {
+    const hash = bcrypt.hashSync(password, 10);
     await pool.query(
-      `INSERT INTO users (username, password, role) VALUES ($1, $2, 'admin')`,
-      ['admin', hash]
+      `INSERT INTO users (username, password, role) VALUES ($1, $2, $3)`,
+      [username, hash, role]
     );
-    console.log('PostgreSQL 数据库已初始化：admin / admin123');
+    console.log(`已创建账号：${username} / ${password}（${role}）`);
   }
 }
 

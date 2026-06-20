@@ -9,7 +9,7 @@ router.get('/', async (req, res) => {
   const { from = '2000-01-01', to = '2099-12-31' } = req.query;
   try {
     const [overview, byType, recent] = await Promise.all([
-      // 总览（SQLite 3.30+ 支持 FILTER）
+      // 总览（PostgreSQL 支持聚合 FILTER 子句）
       db.query(`
         SELECT
           COUNT(*) AS total_orders,
@@ -35,17 +35,18 @@ router.get('/', async (req, res) => {
         ORDER BY count DESC
       `, [from, to]),
 
-      // 近 5 个月趋势（SQLite 使用 strftime 和 date）
+      // 近 5 个月趋势（event_date 为 'YYYY-MM-DD' 文本，取前 7 位即 'YYYY-MM'）
+      // substr 与 $1 参数两种数据库通用，截止日期在 JS 中算好传入
       db.query(`
         SELECT
-          strftime('%Y-%m', event_date) AS month,
+          substr(event_date, 1, 7) AS month,
           COUNT(*) AS count,
           COALESCE(SUM(s.total_amount), 0) AS revenue
         FROM banquet_orders o
         LEFT JOIN settlements s ON o.id = s.order_id
-        WHERE event_date >= date('now', '-5 months')
+        WHERE event_date >= $1
         GROUP BY month ORDER BY month
-      `),
+      `, [db.monthsAgoStr(5)]),
     ]);
 
     res.json({

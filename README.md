@@ -74,9 +74,3 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rural_banquet
 JWT_SECRET=rural_banquet_secret_2026
 PORT=3001
 ```
-
-## 设计文档
-
-- 设计说明: `docs/superpowers/specs/2026-05-13-rural-banquet-design.html`（浏览器打开）
-- 后端实现计划: `docs/superpowers/plans/2026-05-13-rural-banquet-backend.md`
-- 前端实现计划: `docs/superpowers/plans/2026-05-14-rural-banquet-frontend.md`

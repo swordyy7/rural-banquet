@@ -29,13 +29,13 @@ router.post('/:orderId/settlement', async (req, res) => {
         received_amount = excluded.received_amount,
         payment_method  = excluded.payment_method,
         notes           = excluded.notes,
-        settled_at      = datetime('now')
+        settled_at      = $7
       RETURNING *
-    `, [req.params.orderId, total_amount || 0, actual_cost || 0, received_amount || 0, payment_method || null, notes || null]);
+    `, [req.params.orderId, total_amount || 0, actual_cost || 0, received_amount || 0, payment_method || null, notes || null, db.nowStr()]);
 
     await db.query(
-      `UPDATE banquet_orders SET status='completed', updated_at=datetime('now') WHERE id=$1`,
-      [req.params.orderId]
+      `UPDATE banquet_orders SET status='completed', updated_at=$1 WHERE id=$2`,
+      [db.nowStr(), req.params.orderId]
     );
 
     res.json(rows[0]);

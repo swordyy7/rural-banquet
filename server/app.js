@@ -17,5 +17,13 @@ app.use('/api/dishes',      require('./routes/dishes'));
 app.use('/api/materials',   require('./routes/materials'));
 app.use('/api/statistics',  require('./routes/statistics'));
 
+const db = require('./db');
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// 等数据库初始化（建表 / 演示数据）完成后再启动服务
+db.ready
+  .then(() => app.listen(PORT, () => console.log(`Server running on port ${PORT}`)))
+  .catch(err => {
+    console.error('数据库连接/初始化失败:', err.message);
+    process.exit(1);
+  });

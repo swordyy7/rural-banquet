@@ -1,45 +1,36 @@
 require('dotenv').config();
-const { Pool, types } = require('pg');
-const bcrypt = require('bcryptjs');
-const path = require('path');
-const fs = require('fs');
 
-// 让 pg 的返回类型与原先（better-sqlite3）保持一致，前端无需改动：
-//   - bigint（COUNT(*) 等）默认返回字符串 -> 转成 JS number
-//   - numeric（金额字段）默认返回字符串 -> 转成 JS number
-types.setTypeParser(20, v => (v === null ? null : parseInt(v, 10)));   // int8 / bigint
-types.setTypeParser(1700, v => (v === null ? null : parseFloat(v)));   // numeric
+// 通过 .env 的 DB_DRIVER 选择数据库：sqlite（默认，免安装）| postgres
+const name = (process.env.DB_DRIVER || 'sqlite').toLowerCase();
+const isPg = name === 'postgres' || name === 'postgresql' || name === 'pg';
 
-// 云数据库（Neon / Supabase 等）通常强制 SSL；本地 PostgreSQL 可在 .env 设 PGSSL=false
-const useSsl = process.env.PGSSL !== 'false';
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: useSsl ? { rejectUnauthorized: false } : false,
-});
+// 只 require 选中的驱动，未选中的不会加载（sqlite 模式下不会触碰 pg）
+const driver = isPg ? require('./drivers/postgres') : require('./drivers/sqlite');
 
-// 与原接口保持一致：返回 { rows, rowCount }
-function query(text, params = []) {
-  return pool.query(text, params);
+console.log(`数据库驱动：${isPg ? 'PostgreSQL' : 'SQLite'}`);
+
+// 跨方言的“当前时间”字符串：'YYYY-MM-DD HH:MM:SS'
+// 用 JS 生成后作为参数传入，避免 datetime('now') / to_char(now()) 的方言差异
+function nowStr() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+         `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
-// 首次运行：建表 + 演示数据 + 管理员账号
-async function init() {
-  const { rows } = await pool.query(`SELECT to_regclass('public.users') AS t`);
-  const exists = rows[0] && rows[0].t;
-  if (!exists) {
-    const initSql = fs.readFileSync(path.join(__dirname, 'init.sql'), 'utf8');
-    await pool.query(initSql);
-
-    const hash = bcrypt.hashSync('admin123', 10);
-    await pool.query(
-      `INSERT INTO users (username, password, role) VALUES ($1, $2, 'admin')`,
-      ['admin', hash]
-    );
-    console.log('Database initialized: admin / admin123');
-  }
+// 跨方言的“N 个月前”日期字符串：'YYYY-MM-DD'
+function monthsAgoStr(n) {
+  const d = new Date();
+  d.setMonth(d.getMonth() - n);
+  const p = x => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-// 启动时执行初始化，app.js 会 await 这个 Promise 后再监听端口
-const ready = init();
-
-module.exports = { query, pool, ready };
+module.exports = {
+  query: driver.query,
+  ready: driver.ready,
+  handle: driver.handle,
+  driver: isPg ? 'postgres' : 'sqlite',
+  nowStr,
+  monthsAgoStr,
+};

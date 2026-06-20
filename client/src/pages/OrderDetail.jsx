@@ -70,6 +70,7 @@ export default function OrderDetail() {
   }
 
   async function handleSaveSettlement() {
+    if (order.settlement && !confirm('该订单已结算，确认覆盖原结算信息？')) return;
     setSaving(true);
     setSaveMsg(null);
     try {

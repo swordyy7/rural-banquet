@@ -8,13 +8,17 @@ router.use(authenticate);
 router.get('/', async (req, res) => {
   const { search } = req.query;
   try {
-    let query = 'SELECT * FROM customers';
+    let query = `
+      SELECT c.*, v.name AS village_name
+      FROM customers c
+      LEFT JOIN villages v ON c.village_id = v.id
+    `;
     let params = [];
     if (search) {
-      query += ' WHERE name LIKE $1 OR phone LIKE $1';
+      query += ' WHERE c.name LIKE $1 OR c.phone LIKE $1';
       params = [`%${search}%`];
     }
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY c.created_at DESC';
     const { rows } = await db.query(query, params);
     res.json(rows);
   } catch (err) {
@@ -41,12 +45,12 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/customers
 router.post('/', async (req, res) => {
-  const { name, phone, address, notes } = req.body;
+  const { name, phone, village_id, address, notes } = req.body;
   if (!name || !phone) return res.status(400).json({ error: '姓名和电话必填' });
   try {
     const { rows } = await db.query(
-      'INSERT INTO customers (name, phone, address, notes) VALUES ($1,$2,$3,$4) RETURNING *',
-      [name, phone, address || null, notes || null]
+      'INSERT INTO customers (name, phone, village_id, address, notes) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [name, phone, village_id || null, address || null, notes || null]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -56,12 +60,12 @@ router.post('/', async (req, res) => {
 
 // PUT /api/customers/:id
 router.put('/:id', async (req, res) => {
-  const { name, phone, address, notes } = req.body;
+  const { name, phone, village_id, address, notes } = req.body;
   if (!name || !phone) return res.status(400).json({ error: '姓名和电话必填' });
   try {
     const { rows } = await db.query(
-      'UPDATE customers SET name=$1, phone=$2, address=$3, notes=$4 WHERE id=$5 RETURNING *',
-      [name, phone, address || null, notes || null, req.params.id]
+      'UPDATE customers SET name=$1, phone=$2, village_id=$3, address=$4, notes=$5 WHERE id=$6 RETURNING *',
+      [name, phone, village_id || null, address || null, notes || null, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: '客户不存在' });
     res.json(rows[0]);

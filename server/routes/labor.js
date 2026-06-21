@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const db = require('../db');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, blockIfCompleted } = require('../middleware/auth');
 
 router.use(authenticate);
 
@@ -18,7 +18,7 @@ router.get('/:orderId/labor', async (req, res) => {
 });
 
 // POST /api/orders/:orderId/labor
-router.post('/:orderId/labor', async (req, res) => {
+router.post('/:orderId/labor', blockIfCompleted('orderId'), async (req, res) => {
   const { role, name, phone, fee, notes } = req.body;
   if (!role) return res.status(400).json({ error: '角色必填' });
   try {
@@ -33,7 +33,7 @@ router.post('/:orderId/labor', async (req, res) => {
 });
 
 // DELETE /api/orders/:orderId/labor/:laborId
-router.delete('/:orderId/labor/:laborId', async (req, res) => {
+router.delete('/:orderId/labor/:laborId', blockIfCompleted('orderId'), async (req, res) => {
   try {
     await db.query('DELETE FROM labor_arrangements WHERE id=$1 AND order_id=$2', [req.params.laborId, req.params.orderId]);
     res.json({ success: true });

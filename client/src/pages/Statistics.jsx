@@ -36,9 +36,11 @@ export default function Statistics() {
               { label: '总接单数', value: ov.total_orders + ' 单', color: 'bg-blue-50 text-blue-700' },
               { label: '已完成',   value: ov.completed_orders + ' 单', color: 'bg-green-50 text-green-700' },
               { label: '已取消',   value: ov.cancelled_orders + ' 单', color: 'bg-red-50 text-red-600' },
-              { label: '总营收',   value: fmtMoney(ov.total_revenue), color: 'bg-purple-50 text-purple-700' },
-              { label: '总成本',   value: fmtMoney(ov.total_cost), color: 'bg-orange-50 text-orange-700' },
-              { label: '毛利润',   value: fmtMoney(Number(ov.total_revenue) - Number(ov.total_cost)), color: 'bg-emerald-50 text-emerald-700' },
+              { label: '总营收（实收）', value: fmtMoney(ov.total_revenue), color: 'bg-purple-50 text-purple-700' },
+              { label: '总损耗（物料+额外）', value: fmtMoney(ov.total_cost), color: 'bg-orange-50 text-orange-700' },
+              { label: '利润',     value: fmtMoney(Number(ov.total_revenue) - Number(ov.total_cost)), color: 'bg-emerald-50 text-emerald-700' },
+              { label: '合同服务费', value: fmtMoney(ov.total_service_fee), color: 'bg-indigo-50 text-indigo-700' },
+              { label: '其中物料损耗', value: fmtMoney(data.loss_overview?.total_loss_amount), color: 'bg-rose-50 text-rose-600' },
             ].map(c => (
               <div key={c.label} className={`${c.color} rounded-xl p-4`}>
                 <div className="text-xs font-medium opacity-70 mb-1">{c.label}</div>
@@ -67,6 +69,31 @@ export default function Statistics() {
                 ))}
                 {data.by_type.length === 0 && (
                   <tr><td colSpan={3} className="py-4 text-center text-gray-400">暂无数据</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">物料损耗统计</h3>
+            <table className="w-full text-sm">
+              <thead className="text-xs text-gray-500">
+                <tr>
+                  <th className="text-left pb-2 font-medium">物料</th>
+                  <th className="text-right pb-2 font-medium">损耗数量</th>
+                  <th className="text-right pb-2 font-medium">损耗金额</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {(data.loss_by_material || []).map(r => (
+                  <tr key={r.material_name}>
+                    <td className="py-2">{r.material_name || '-'}</td>
+                    <td className="py-2 text-right">{Number(r.loss_qty)}</td>
+                    <td className="py-2 text-right text-rose-600">{fmtMoney(r.loss_amount)}</td>
+                  </tr>
+                ))}
+                {(!data.loss_by_material || data.loss_by_material.length === 0) && (
+                  <tr><td colSpan={3} className="py-4 text-center text-gray-400">暂无损耗数据</td></tr>
                 )}
               </tbody>
             </table>

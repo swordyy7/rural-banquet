@@ -1,0 +1,6 @@
+flowchart TD
+  A["客户端（浏览器）<br/>React 单页应用 / Vite 构建"]
+  B["应用服务器<br/>Node.js + Express<br/>REST API / JWT 鉴权 / bcrypt"]
+  C[("数据库服务器<br/>PostgreSQL / SQLite")]
+  A -- "HTTP / JSON" --> B
+  B -- "SQL" --> C

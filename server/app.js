@@ -11,10 +11,13 @@ app.use('/api/customers',   require('./routes/customers'));
 app.use('/api/orders',      require('./routes/orders'));
 app.use('/api/orders',      require('./routes/changes'));
 app.use('/api/orders',      require('./routes/labor'));
+app.use('/api/orders',      require('./routes/orderMaterials'));
 app.use('/api/orders',      require('./routes/settlements'));
 app.use('/api/menus',       require('./routes/menus'));
 app.use('/api/dishes',      require('./routes/dishes'));
 app.use('/api/materials',   require('./routes/materials'));
+app.use('/api/villages',    require('./routes/villages'));
+app.use('/api/price-bands', require('./routes/priceBands'));
 app.use('/api/statistics',  require('./routes/statistics'));
 
 const db = require('./db');

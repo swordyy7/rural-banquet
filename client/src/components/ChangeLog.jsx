@@ -3,7 +3,6 @@ import { fmtDate } from '../utils/format';
 const CHANGE_LABEL = {
   table_count: '桌数变更',
   reschedule: '改期',
-  menu_change: '换菜',
   cancellation: '退订',
 };
 

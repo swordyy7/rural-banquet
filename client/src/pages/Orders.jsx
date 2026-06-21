@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getOrders, getCustomers, createOrder, checkSchedule } from '../api';
+import { getOrders, getCustomers, createOrder, checkSchedule, getVillages, matchPriceBand } from '../api';
 import StatusBadge from '../components/StatusBadge';
 import { fmtDate, BANQUET_TYPES, STATUS_LABEL } from '../utils/format';
 
@@ -19,17 +19,20 @@ function Modal({ title, onClose, children }) {
 }
 
 const EMPTY_ORDER = {
-  customer_id: '', banquet_type: '婚宴', event_date: '', location: '',
-  table_count: '', guest_count: '', budget: '', notes: ''
+  customer_id: '', banquet_type: '婚宴', event_date: '', village_id: '', location: '',
+  table_count: '', guest_count: '', budget: '', service_fee: '', notes: ''
 };
 
 export default function Orders() {
   const [list, setList]             = useState([]);
   const [customers, setCustomers]   = useState([]);
+  const [villages, setVillages]     = useState([]);
   const [filters, setFilters]       = useState({ status: '', from: '', to: '' });
   const [modal, setModal]           = useState(false);
   const [form, setForm]             = useState(EMPTY_ORDER);
   const [scheduleAlert, setScheduleAlert] = useState(null);
+  const [feeMatch, setFeeMatch]     = useState(null);   // 当前匹配到的价格带 { band, fee }，null=未匹配/桌数未填
+  const [feeOverridden, setFeeOverridden] = useState(false); // 用户是否手动改过服务费
   const [error, setError]           = useState('');
   const navigate = useNavigate();
 
@@ -42,7 +45,44 @@ export default function Orders() {
   }
 
   useEffect(() => { load(); }, [filters]);
-  useEffect(() => { getCustomers().then(setCustomers); }, []);
+  useEffect(() => { getCustomers().then(setCustomers); getVillages().then(setVillages); }, []);
+
+  // 服务费 = 整单一口价，取决于 村 + 日期 + 桌数；桌数填了才匹配（否则会误落到兜底价）
+  useEffect(() => {
+    if (!modal) return;
+    const tables = Number(form.table_count);
+    if (!form.table_count || !Number.isFinite(tables) || tables <= 0) {
+      setFeeMatch(null);   // 桌数未填，先不匹配，避免显示误导性价格
+      return;
+    }
+    let cancelled = false;
+    matchPriceBand(form.village_id || '', form.event_date || '', form.table_count)
+      .then(res => {
+        if (cancelled) return;
+        const m = { band: res.band?.name || '', fee: res.service_fee };
+        setFeeMatch(m);
+        // 用户没手动改过时，才自动带入匹配值
+        if (!feeOverridden && res.service_fee != null) {
+          setForm(f => ({ ...f, service_fee: String(res.service_fee) }));
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [form.village_id, form.event_date, form.table_count, modal, feeOverridden]);
+
+  // 关联客户时，村与详细地址默认带出该客户的资料；
+  // 仅在为空、或仍是上一个客户自动带出的值时才覆盖，避免冲掉手填内容
+  function handleCustomerChange(customerId) {
+    setForm(f => {
+      const prev = customers.find(c => String(c.id) === String(f.customer_id));
+      const next = customers.find(c => String(c.id) === String(customerId));
+      const locAuto = !f.location || (prev && f.location === (prev.address || ''));
+      const location = locAuto ? (next?.address || '') : f.location;
+      const vilAuto = !f.village_id || (prev && String(f.village_id) === String(prev.village_id ?? ''));
+      const village_id = vilAuto ? (next?.village_id != null ? String(next.village_id) : '') : f.village_id;
+      return { ...f, customer_id: customerId, location, village_id };
+    });
+  }
 
   async function handleDateChange(date) {
     setForm(f => ({ ...f, event_date: date }));
@@ -63,9 +103,11 @@ export default function Orders() {
       const order = await createOrder({
         ...form,
         customer_id: form.customer_id || null,
+        village_id:  form.village_id || null,
         table_count: Number(form.table_count),
         guest_count: form.guest_count ? Number(form.guest_count) : null,
         budget:      form.budget ? Number(form.budget) : null,
+        service_fee: form.service_fee !== '' ? Number(form.service_fee) : null,
       });
       setModal(false);
       navigate(`/orders/${order.id}`);
@@ -79,7 +121,7 @@ export default function Orders() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold text-gray-900">宴席订单</h2>
         <button
-          onClick={() => { setForm(EMPTY_ORDER); setError(''); setScheduleAlert(null); setModal(true); }}
+          onClick={() => { setForm(EMPTY_ORDER); setError(''); setScheduleAlert(null); setFeeMatch(null); setFeeOverridden(false); setModal(true); }}
           className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700"
         >+ 新建订单</button>
       </div>
@@ -140,7 +182,7 @@ export default function Orders() {
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">关联客户</label>
               <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                value={form.customer_id} onChange={e => setForm({ ...form, customer_id: e.target.value })}>
+                value={form.customer_id} onChange={e => handleCustomerChange(e.target.value)}>
                 <option value="">不关联</option>
                 {customers.map(c => <option key={c.id} value={c.id}>{c.name}（{c.phone}）</option>)}
               </select>
@@ -162,8 +204,16 @@ export default function Orders() {
                 </div>
               )}
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">村（地点，用于服务费匹配）</label>
+              <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                value={form.village_id} onChange={e => setForm({ ...form, village_id: e.target.value })}>
+                <option value="">未指定</option>
+                {villages.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </div>
             {[
-              ['location', '地点', 'text'],
+              ['location', '详细地址', 'text'],
               ['table_count', '桌数 *', 'number'],
               ['guest_count', '人数', 'number'],
               ['budget', '预算（元）', 'number'],
@@ -174,6 +224,20 @@ export default function Orders() {
                   value={form[f]} onChange={e => setForm({ ...form, [f]: e.target.value })} />
               </div>
             ))}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">服务费（元）· 按价格带自动匹配，可手改</label>
+              <input type="number" min="0" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                value={form.service_fee} onChange={e => { setFeeOverridden(true); setForm({ ...form, service_fee: e.target.value }); }} />
+              {!form.table_count ? (
+                <p className="mt-1 text-xs text-gray-400">填写桌数后按价格带自动匹配服务费</p>
+              ) : feeMatch == null ? null : feeMatch.fee == null ? (
+                <p className="mt-1 text-xs text-amber-600">未匹配到价格带，请手动填写服务费</p>
+              ) : feeOverridden && String(feeMatch.fee) !== String(form.service_fee) ? (
+                <p className="mt-1 text-xs text-gray-500">价格带「{feeMatch.band}」建议 ¥{feeMatch.fee}，当前已手动填写</p>
+              ) : (
+                <p className="mt-1 text-xs text-emerald-600">按价格带「{feeMatch.band}」自动计 ¥{feeMatch.fee}</p>
+              )}
+            </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">备注</label>
               <textarea className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows={2}

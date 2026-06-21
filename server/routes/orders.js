@@ -77,6 +77,7 @@ router.get('/:id', async (req, res) => {
         LEFT JOIN menus m ON omd.menu_id = m.id
         LEFT JOIN dishes d ON omd.dish_id = d.id
         WHERE omd.order_id = $1
+        ORDER BY omd.id
       `, [req.params.id]),
       db.query('SELECT * FROM labor_arrangements WHERE order_id = $1', [req.params.id]),
       db.query('SELECT * FROM change_records WHERE order_id = $1 ORDER BY created_at DESC', [req.params.id]),
@@ -156,9 +157,40 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 router.post('/:id/menu-details', async (req, res) => {
   const { menu_id, dish_id, quantity, notes } = req.body;
   try {
+    if (menu_id) {
+      const { rows: menuDishes } = await db.query(`
+        SELECT dish_id, quantity, notes
+        FROM menu_dishes
+        WHERE menu_id = $1
+        ORDER BY sort_order, id
+      `, [menu_id]);
+      if (menuDishes.length === 0) {
+        return res.status(400).json({ error: '该菜单模板未关联菜品，请先在菜单管理中配置菜品' });
+      }
+      const inserted = [];
+      for (const item of menuDishes) {
+        const { rows } = await db.query(
+          'INSERT INTO order_menu_details (order_id,menu_id,dish_id,quantity,notes) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+          [
+            req.params.id,
+            menu_id,
+            item.dish_id,
+            (Number(item.quantity) || 1) * (Number(quantity) || 1),
+            item.notes || notes || null,
+          ]
+        );
+        inserted.push(rows[0]);
+      }
+      return res.status(201).json(inserted);
+    }
+
+    if (!dish_id) {
+      return res.status(400).json({ error: '请选择菜单模板或菜品' });
+    }
+
     const { rows } = await db.query(
       'INSERT INTO order_menu_details (order_id,menu_id,dish_id,quantity,notes) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-      [req.params.id, menu_id || null, dish_id || null, quantity || 1, notes || null]
+      [req.params.id, null, dish_id, quantity || 1, notes || null]
     );
     res.status(201).json(rows[0]);
   } catch (err) {

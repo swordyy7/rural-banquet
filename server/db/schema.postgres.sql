@@ -56,6 +56,17 @@ CREATE TABLE IF NOT EXISTS dishes (
   created_at  TEXT DEFAULT to_char(now(), 'YYYY-MM-DD HH24:MI:SS')
 );
 
+-- 菜单模板菜品明细表
+CREATE TABLE IF NOT EXISTS menu_dishes (
+  id         SERIAL PRIMARY KEY,
+  menu_id    INTEGER NOT NULL REFERENCES menus(id) ON DELETE CASCADE,
+  dish_id    INTEGER NOT NULL REFERENCES dishes(id) ON DELETE CASCADE,
+  quantity   INTEGER NOT NULL DEFAULT 1,
+  notes      TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(menu_id, dish_id)
+);
+
 -- 订单菜单明细表
 CREATE TABLE IF NOT EXISTS order_menu_details (
   id        SERIAL PRIMARY KEY,
@@ -132,4 +143,22 @@ ON CONFLICT DO NOTHING;
 INSERT INTO menus (name, scene, price, description) VALUES
   ('婚宴标准套餐', '婚宴', 888.00, '14 道菜，10 桌起订'),
   ('寿宴喜庆套餐', '寿宴', 666.00, '12 道菜，含寿桃')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO menu_dishes (menu_id, dish_id, quantity, sort_order)
+SELECT m.id, d.id, 1,
+  CASE d.name
+    WHEN '红烧肉' THEN 1
+    WHEN '白切鸡' THEN 2
+    WHEN '糖醋鲤鱼' THEN 3
+    WHEN '凉拌黄瓜' THEN 4
+    WHEN '蒸鸡蛋' THEN 5
+    ELSE 99
+  END
+FROM menus m
+JOIN dishes d ON (
+  (m.name = '婚宴标准套餐' AND d.name IN ('红烧肉', '白切鸡', '糖醋鲤鱼', '凉拌黄瓜'))
+  OR
+  (m.name = '寿宴喜庆套餐' AND d.name IN ('白切鸡', '蒸鸡蛋', '红烧肉'))
+)
 ON CONFLICT DO NOTHING;

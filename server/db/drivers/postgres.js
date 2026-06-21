@@ -32,6 +32,8 @@ async function init() {
     console.log('PostgreSQL 数据库结构已初始化');
   }
 
+  await ensureMenuDishes();
+
   for (const user of defaultUsers) {
     await ensureUser(user.username, user.password, user.role);
   }
@@ -50,6 +52,40 @@ async function ensureUser(username, password, role) {
     );
     console.log(`已创建账号：${username} / ${password}（${role}）`);
   }
+}
+
+async function ensureMenuDishes() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS menu_dishes (
+      id         SERIAL PRIMARY KEY,
+      menu_id    INTEGER NOT NULL REFERENCES menus(id) ON DELETE CASCADE,
+      dish_id    INTEGER NOT NULL REFERENCES dishes(id) ON DELETE CASCADE,
+      quantity   INTEGER NOT NULL DEFAULT 1,
+      notes      TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(menu_id, dish_id)
+    )
+  `);
+
+  await pool.query(`
+    INSERT INTO menu_dishes (menu_id, dish_id, quantity, sort_order)
+    SELECT m.id, d.id, 1,
+      CASE d.name
+        WHEN '红烧肉' THEN 1
+        WHEN '白切鸡' THEN 2
+        WHEN '糖醋鲤鱼' THEN 3
+        WHEN '凉拌黄瓜' THEN 4
+        WHEN '蒸鸡蛋' THEN 5
+        ELSE 99
+      END
+    FROM menus m
+    JOIN dishes d ON (
+      (m.name = '婚宴标准套餐' AND d.name IN ('红烧肉', '白切鸡', '糖醋鲤鱼', '凉拌黄瓜'))
+      OR
+      (m.name = '寿宴喜庆套餐' AND d.name IN ('白切鸡', '蒸鸡蛋', '红烧肉'))
+    )
+    ON CONFLICT DO NOTHING
+  `);
 }
 
 module.exports = { query, ready: init(), handle: pool };
